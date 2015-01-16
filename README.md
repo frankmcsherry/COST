@@ -1,8 +1,8 @@
 # COST
 
-This project contains single-threaded implementations of three graph algorithms, [PageRank](http://en.wikipedia.org/wiki/PageRank), [label propagation](http://www.cs.cmu.edu/~ukang/papers/HalfpICDE2011.pdf), and [union-find](http://en.wikipedia.org/wiki/Disjoint-set_data_structure), supporting performance measurements taken on two graphs, [twitter_rv](http://an.kaist.ac.kr/traces/WWW2010.html) and [uk_2007_05](http://law.di.unimi.it/webdata/uk-2007-05/).
+COST is an acronym for the "Configuration that Outperforms a Single Thread", indicating the hardware resources required by a distributed system before it begins to outperform a single-threaded implementation. This repository contains the single-threaded implementations providing the baseline performance.
 
-COST is an acronym for the "Configuration that Outperforms a Single Thread", indicating the hardware resources required before the system begins to outperform a single-threaded implementation.
+Specifically, this project contains single-threaded implementations of three graph algorithms, [PageRank](http://en.wikipedia.org/wiki/PageRank), [label propagation](http://www.cs.cmu.edu/~ukang/papers/HalfpICDE2011.pdf), and [union-find](http://en.wikipedia.org/wiki/Disjoint-set_data_structure), supporting performance measurements taken on two graphs, [twitter_rv](http://an.kaist.ac.kr/traces/WWW2010.html) and [uk_2007_05](http://law.di.unimi.it/webdata/uk-2007-05/).
 
 ## Instructions
 
@@ -20,7 +20,7 @@ Usage: COST pagerank  (vertex | hilbert) <path_prefix>
        COST union_find (vertex | hilbert) <path_prefix>
        COST to_hilbert [--dense] <path_prefix>
 ```
-The first modes correspond to the three graph algorithms. The second parameter indicates the binary graph layout. The final parameter must be a path prefix for which certain extensions exist as files, discussed in a moment. The fourth mode performs a graph layout according to a Hilbert space-filling curve, and prints the results to the screen (it will be on you to write back to your computer).
+The first three modes correspond to the three graph algorithms. The second parameter indicates the binary graph layout. The final parameter must be a path prefix for which certain extensions exist as files, discussed in a moment. The fourth mode performs a graph layout according to a Hilbert space-filling curve, and prints the results to the screen (it will be on you to write back to your computer).
 
 ## Graph input
 The computation will not do anything productive without graph data, and the graph data use for experiments (processed versions of the graphs linked above) are too large to host here. I'm also not wild about distributing programs that write data back to someone else's computer, without more serious review. That being said, the file `src/twitter_parser.rs` has the code that I used.
