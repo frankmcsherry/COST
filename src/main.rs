@@ -20,10 +20,10 @@ mod graph_iterator;
 mod twitter_parser;
 
 static USAGE: &'static str = "
-Usage: COST pagerank  (vertex | hilbert) <path_prefix>
-       COST label_prop (vertex | hilbert) <path_prefix>
-       COST union_find (vertex | hilbert) <path_prefix>
-       COST to_hilbert [--dense] <path_prefix>
+Usage: COST pagerank  (vertex | hilbert) <prefix>
+       COST label_prop (vertex | hilbert) <prefix>
+       COST union_find (vertex | hilbert) <prefix>
+       COST to_hilbert [--dense] <prefix>
 ";
 
 
@@ -34,28 +34,28 @@ fn main()
     let nodes = 65000000;
 
     if args.get_bool("vertex") {
-        let graph = NodesEdgesMemMapper::new(args.get_str("<path_prefix>"));
+        let graph = NodesEdgesMemMapper::new(args.get_str("<prefix>"));
         if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
         if args.get_bool("label_prop") { label_propagation(&graph, nodes); }
         if args.get_bool("union_find") { union_find(&graph, nodes); }
     }
 
     if args.get_bool("hilbert") {
-        let graph = UpperLowerMemMapper::new(args.get_str("<path_prefix>"));
+        let graph = UpperLowerMemMapper::new(args.get_str("<prefix>"));
         if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
         if args.get_bool("label_prop") { label_propagation(&graph, nodes); }
         if args.get_bool("union_find") { union_find(&graph, nodes); }
     }
 
     // if args.get_bool("secret") {
-    //     let graph = UpperLowerMapper::new(args.get_str("<path_prefix>"));
+    //     let graph = UpperLowerMapper::new(args.get_str("<prefix>"));
     //     if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
     //     if args.get_bool("labelprop") { label_propagation(&graph, nodes); }
     //     if args.get_bool("unionfind") { union_find(&graph, nodes); }
     // }
 
     if args.get_bool("to_hilbert") {
-        let graph = NodesEdgesMemMapper::new(args.get_str("<path_prefix>"));
+        let graph = NodesEdgesMemMapper::new(args.get_str("<prefix>"));
         convert_to_hilbert(&graph, args.get_bool("--dense"), |ux, uy, c, ls| {
             println!("uppers: ({}, {}); count: {}", ux, uy, c);
             for &(lx, ly) in ls.iter(){ println!("\t({}, {})", lx, ly); }
