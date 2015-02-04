@@ -1,48 +1,52 @@
-use std::io::{File, Open, Read, BufferedReader, Write, BufferedWriter, IoResult};
+use std::old_io::{File, Open, Read, BufferedReader, Write, BufferedWriter};
+use graph_iterator::EdgeMapper;
 
 // source should be something like "path/to/twitter_rv.net"
 // target should be so that you don't mind having "target.nodes" and "target.edges" clobbered.
-fn _parse_twitter(source: &str, target: &str) -> IoResult<()> {
-    let p = Path::new(source);
-    let pn = Path::new(format!("{}.nodes", target));
-    let pe = Path::new(format!("{}.edges", target));
+pub fn _parse_to_vertex(source: &str, target: &str) {
+    let reader_mapper = ReaderMapper {
+        reader: || BufferedReader::new(File::open_mode(&Path::new(source), Open, Read).unwrap())
+    };
 
-    let mut reader = BufferedReader::new(try!(File::open_mode(&p, Open, Read)));
-    let mut edge_writer = BufferedWriter::new(try!(File::open_mode(&pe, Open, Write)));
-    let mut node_writer = BufferedWriter::new(try!(File::open_mode(&pn, Open, Write)));
+    let mut edge_writer = BufferedWriter::new(File::open_mode(&Path::new(format!("{}.edges", target)), Open, Write).ok().expect("err"));
+    let mut node_writer = BufferedWriter::new(File::open_mode(&Path::new(format!("{}.nodes", target)), Open, Write).ok().expect("err"));
 
-    let line = try!(reader.read_line());
-    let elts: Vec<&str> = line.as_slice().words().collect();
+    let mut cnt = 0;
+    let mut src = 0;
 
-    let mut src: u32 = elts[0].parse().expect("malformed src");
-    let mut dst: u32 = elts[1].parse().expect("malformed dst");
-
-    try!(edge_writer.write_le_u32(dst));
-    let mut ctr: u32 = 1;
-
-    for readline in reader.lines() {
-        let line = try!(readline);
-
-        let elts: Vec<&str> = line.as_slice().words().collect();
-
-        let read_src: u32 = elts[0].parse().expect("malformed src");
-        let read_dst: u32 = elts[1].parse().expect("malformed dst");
-
-        if read_src != src {
-            try!(node_writer.write_le_u32(src));
-            try!(node_writer.write_le_u32(ctr));
-            ctr = 0;
+    reader_mapper.map_edges(|x, y| {
+        if x != src {
+            if cnt > 0 {
+                node_writer.write_le_u32(src).ok().expect("write error");
+                node_writer.write_le_u32(cnt).ok().expect("write error");
+                cnt = 0;
+            }
+            src = x;
         }
 
-        try!(edge_writer.write_le_u32(dst));
-        ctr = ctr + 1;
+        edge_writer.write_le_u32(y).ok().expect("write error");
+        cnt += 1;
+    });
 
-        src = read_src;
-        dst = read_dst;
+    if cnt > 0 {
+        node_writer.write_le_u32(src).ok().expect("write error");
+        node_writer.write_le_u32(cnt).ok().expect("write error");
     }
+}
 
-    try!(node_writer.write_le_u32(src));
-    try!(node_writer.write_le_u32(ctr));
+pub struct ReaderMapper<B: Buffer, F: Fn() -> B> {
+    pub reader: F,
+}
 
-    return Ok(());
+impl<R:Buffer, RF: Fn() -> R> EdgeMapper for ReaderMapper<R, RF> {
+    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
+        let mut reader = (self.reader)();
+        for readline in reader.lines() {
+            let line = readline.ok().expect("read error");
+            let elts: Vec<&str> = line.as_slice().words().collect();
+            let src: u32 = elts[0].parse().expect("malformed src");
+            let dst: u32 = elts[1].parse().expect("malformed dst");
+            action(src, dst);
+        }
+    }
 }

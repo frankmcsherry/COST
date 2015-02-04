@@ -1,12 +1,12 @@
 use std::mem;
 use core::raw::Slice as RawSlice;
-use std::io::fs::stat;
-use std::io::{File, Open, Read};
+use std::old_io::fs::stat;
+use std::old_io::{File, Open, Read};
 // use std::io::IoResult
 use std::os::MapOption::{MapReadable, MapFd};
 use std::os::MemoryMap;
 use std::os::unix::prelude::AsRawFd;
-use std::ops;
+use core::ops;
 // use std::slice::AsSlice;
 
 pub struct TypedMemoryMap<T:Copy> {
@@ -18,6 +18,8 @@ impl<T:Copy> TypedMemoryMap<T> {
     pub fn new(filename: String) -> TypedMemoryMap<T> {
         let path = Path::new(filename.to_string());
         let size = stat(&path).ok().expect("unable to find file size").size as usize;
+
+        // println!("file {}; size {}", filename, size);
         let file = File::open_mode(&path, Open, Read).ok().expect("unable to open file");
         TypedMemoryMap {
             map: MemoryMap::new(size, &[MapReadable, MapFd(file.as_raw_fd())]).ok().expect("unable to map file"),
@@ -31,10 +33,10 @@ impl<T:Copy> ops::Index<ops::Range<usize>> for TypedMemoryMap<T> {
     #[inline] fn index(&self, index: &ops::Range<usize>) -> &[T] { &self[][*index] }
 }
 
-impl<T:Copy> ops::Index<ops::FullRange> for TypedMemoryMap<T> {
+impl<T:Copy> ops::Index<ops::RangeFull> for TypedMemoryMap<T> {
     type Output = [T];
     #[inline]
-    fn index(&self, _index: &ops::FullRange) -> &[T] {
+    fn index(&self, _index: &ops::RangeFull) -> &[T] {
         assert!(self.len <= self.map.len());
         unsafe { mem::transmute(RawSlice {
             data: self.map.data() as *const u8,

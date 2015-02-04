@@ -1,18 +1,9 @@
-// use std::io::{File, Open, Read, BufferedReader};
-// use std::io::fs::stat;
-// use std::cmp::min;
-
+use hilbert_curve::BytewiseCached;
 use typedrw::TypedMemoryMap;
-// use typedrw::TypedReader;
 
 pub trait EdgeMapper {
     fn map_edges<F: FnMut(u32, u32) -> ()>(&self, action: F) -> ();
 }
-
-pub trait NodeMapper {
-    fn map_nodes<F: FnMut(u32, &[u32]) -> ()>(&self, action: F) -> ();
-}
-
 
 pub struct UpperLowerMemMapper {
     upper:  TypedMemoryMap<((u16,u16), u32)>,
@@ -43,6 +34,51 @@ impl EdgeMapper for UpperLowerMemMapper {
     }
 }
 
+pub struct DeltaCompressedReaderMapper<R: Reader, F: Fn()->R> {
+    reader:      F,
+}
+
+impl<R: Reader, F: Fn()->R> DeltaCompressedReaderMapper<R, F> {
+    pub fn new(reader: F) -> DeltaCompressedReaderMapper<R, F> {
+        DeltaCompressedReaderMapper {
+            reader: reader,
+        }
+    }
+}
+
+impl<R: Reader, F: Fn()->R> EdgeMapper for DeltaCompressedReaderMapper<R, F> {
+    fn map_edges<A: FnMut(u32, u32) -> ()>(&self, mut action: A) -> () {
+
+        let mut hilbert = BytewiseCached::new();
+        let mut current = 0u64;
+        let mut reader = (self.reader)();
+
+        let mut delta = 0u64;    // for accumulating a delta
+        let mut depth = 0u8;     // for counting number of zeros
+
+        let mut buffer = Vec::with_capacity(1 << 16);
+        while let Ok(_) = reader.push(1 << 16, &mut buffer) {
+            for byte in buffer.drain() {
+                if byte == 0 && delta == 0 {
+                    depth += 1;
+                }
+                else {
+                    delta = (delta << 8) + (byte as u64);
+                    if depth == 0 {
+                        current += delta;
+                        delta = 0;
+                        let (x,y) = hilbert.detangle(current);
+                        action(x,y);
+                    }
+                    else {
+                        depth -= 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 pub struct NodesEdgesMemMapper {
     nodes:  TypedMemoryMap<(u32, u32)>,
@@ -67,17 +103,6 @@ impl EdgeMapper for NodesEdgesMemMapper {
                 action(node, edge);
             }
 
-            offset = limit;
-        }
-    }
-}
-
-impl NodeMapper for NodesEdgesMemMapper {
-    fn map_nodes<F: FnMut(u32, &[u32]) -> ()>(&self, mut action: F) -> () {
-        let mut offset = 0us;
-        for &(node, count) in self.nodes[].iter() {
-            let limit = offset + count as usize;
-            action(node, &self.edges[offset..limit]);
             offset = limit;
         }
     }

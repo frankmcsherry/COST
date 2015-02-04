@@ -5,5 +5,5 @@ version = "0.0.1"
 authors = ["Frank McSherry <fmcsherry@me.com>"]
 
 [dependencies]
-docopt="0.6.30"
-docopt_macros = "0.6.30"
+docopt="0.6.33"
+docopt_macros = "0.6.33"

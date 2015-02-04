@@ -1,10 +1,100 @@
+use std::collections::HashMap;
 use graph_iterator::EdgeMapper;
+// use typedrw::TypedMemoryMap;
+#[test] use std::old_io::{MemWriter, MemReader};
+
+#[inline]
+pub fn encode<W: Writer>(writer: &mut W, diff: u64) {
+    assert!(diff > 0);
+    // let mut temp = MemWriter::new();
+    for &shift in [56, 48, 40, 32, 24, 16, 8].iter() {
+        if (diff >> shift) != 0 {
+            writer.write_u8(0u8).ok().expect("write error");
+        }
+    }
+    for &shift in [56, 48, 40, 32, 24, 16, 8].iter() {
+        if (diff >> shift) != 0 {
+            writer.write_u8((diff >> shift) as u8).ok().expect("write error");
+        }
+    }
+    writer.write_u8(diff as u8).ok().expect("write error");
+}
+
+#[inline]
+pub fn decode<R: Reader>(reader: &mut R) -> Option<u64> {
+    if let Ok(mut read) = reader.read_u8 () {
+        let mut count = 0u64;
+        while read == 0 {
+            count += 1;
+            read = reader.read_u8().unwrap();
+        }
+
+        let mut diff = read as u64;
+        for _ in (0..count) {
+            diff = (diff << 8) + (reader.read_u8().unwrap() as u64);
+        }
+
+        Some(diff)
+    }
+    else { None }
+}
+
+#[test]
+fn test_encode_decode() {
+    let test_vec = vec![1, 2, 1 << 20, 1 << 60];
+    let mut writer = MemWriter::new();
+    for &elt in test_vec.iter() {
+        encode(&mut writer, elt);
+    }
+
+    let mut test_out = Vec::new();
+    let mut reader = MemReader::new(writer.into_inner());
+    while let Some(elt) = decode(&mut reader) {
+        test_out.push(elt);
+    }
+
+    assert_eq!(test_vec, test_out);
+}
+
+pub struct Decoder<R: Reader> {
+    reader:     R,
+    current:    u64,
+}
+
+impl<R: Reader> Decoder<R> {
+    pub fn new(reader: R) -> Decoder<R> {
+        Decoder { reader: reader, current: 0 }
+    }
+}
+
+impl<R: Reader> Iterator for Decoder<R> {
+    type Item = u64;
+    fn next(&mut self) -> Option<u64> {
+        if let Some(diff) = decode(&mut self.reader) {
+            assert!(self.current < self.current + diff);
+            self.current += diff;
+            Some(self.current)
+        }
+        else { None }
+    }
+}
+
+pub fn to_hilbert<I, O>(graph: &I, mut output: O) -> ()
+where I : EdgeMapper,
+      O : FnMut(u64)->(),
+{
+    let hilbert = BytewiseHilbert::new();
+    let mut buffer = Vec::new();
+    graph.map_edges(|node, edge| { buffer.push(hilbert.entangle((node, edge))); });
+    buffer.sort();
+    for &element in buffer.iter() { output(element); }
+}
 
 pub fn convert_to_hilbert<I, O>(graph: &I, make_dense: bool, mut output: O) -> ()
 where I : EdgeMapper,
       O : FnMut(u16, u16, u32, &Vec<(u16, u16)>) -> (),
 {
-    let mut uppers = Vec::new();
+    let mut uppers: HashMap<u32,Vec<u32>> = HashMap::new();
     let mut names = Vec::new();
     let mut names_count = 0i32;
     let hilbert = BytewiseHilbert::new();
@@ -21,14 +111,17 @@ where I : EdgeMapper,
         let upper = (entangled >> 32) as u32;
         let lower = entangled as u32;
 
-        while uppers.len() as u32 <= upper { uppers.push(Vec::new()); }
-        uppers[upper as usize].push(lower);
+        if !uppers.contains_key(&upper) { uppers.insert(upper, Vec::new()); }
+        uppers[upper].push(lower);
     });
 
+    let mut keys: Vec<u32> = uppers.keys().map(|x|x.clone()).collect();
+    keys.sort();
+
     let mut temp = Vec::new();
-    for (upper, lowers) in uppers.iter_mut().enumerate() {
+    for &upper in keys.iter() {
+        let mut lowers = uppers.remove(&upper).unwrap();
         if lowers.len() > 0 {
-            let upper = upper as u64;
             let upair = hilbert.detangle((upper as u64) << 32);
             let upperx = (upair.0 >> 16) as u16;
             let uppery = (upair.1 >> 16) as u16;
@@ -38,8 +131,7 @@ where I : EdgeMapper,
             temp.clear();
 
             for &lower in lowers.iter() {
-                // TODO : Could cache mirror/flip behavior from upper rather than recompute.
-                let lpair = hilbert.detangle(upper + (lower as u64));
+                let lpair = hilbert.detangle(((upper as u64) << 32) + (lower as u64));
                 let lowerx = (lpair.0 & 65535u32) as u16;
                 let lowery = (lpair.1 & 65535u32) as u16;
                 temp.push((lowerx, lowery));
@@ -50,8 +142,99 @@ where I : EdgeMapper,
     }
 }
 
+pub fn merge<I: Iterator<Item=u64>, O: FnMut(u64)->()>(mut iterators: Vec<I>, mut output: O) {
+    let mut values = Vec::new();
+    for iterator in iterators.iter_mut() { values.push(iterator.next()); }
+
+    let mut val_old = 0;
+    let mut done = false;
+    while !done {
+        let mut arg_min = iterators.len();
+        let mut val_min = 0u64;
+        for (index, &value) in values.iter().enumerate() {
+            if let Some(val) = value {
+                if arg_min > index || val < val_min {
+                    arg_min = index;
+                    val_min = val;
+                    // done = false;
+                }
+            }
+        }
+
+        if arg_min < iterators.len() {
+            values[arg_min] = iterators[arg_min].next();
+            if let Some(val) = values[arg_min] {
+                assert!(val > val_min);
+            }
+            assert!(val_old <= val_min);
+            val_old = val_min;
+            output(val_min);
+        }
+        else {
+            done = true;
+        }
+    }
+
+    // confirm that we haven't left anything behind
+    assert!(!values.iter().any(|x|x.is_some()));
+}
+
 // algorithm drawn in large part from http://en.wikipedia.org/wiki/Hilbert_curve
 // bytewise implementation based on tracking cumulative rotation / mirroring.
+
+pub struct BytewiseCached {
+    hilbert:    BytewiseHilbert,
+    prev_hi:    u64,
+    prev_out:   (u32, u32),
+    prev_rot:   (bool, bool),
+}
+
+impl BytewiseCached {
+    pub fn detangle(&mut self, tangle: u64) -> (u32, u32) {
+        let (mut x_byte, mut y_byte) = self.hilbert.detangle[tangle as u16 as usize];
+
+        // validate self.prev_rot, self.prev_out
+        if self.prev_hi != (tangle >> 16) {
+            self.prev_hi = tangle >> 16;
+
+            // detangle with a bit set to see what happens to it
+            let low = 255; //self.hilbert.entangle((0xF, 0)) as u16;
+            let (x, y) = self.hilbert.detangle((self.prev_hi << 16) + low as u64);
+
+            let value = (x as u8, y as u8);
+            self.prev_rot = match value {
+                (0x0F, 0x00) => (false, false), // nothing
+                (0x00, 0x0F) => (true, false),  // swapped
+                (0xF0, 0xFF) => (false, true),  // flipped
+                (0xFF, 0xF0) => (true, true),   // flipped & swapped
+                val => panic!(format!("Found : ({:x}, {:x})", val.0, val.1)),
+            };
+            self.prev_out = (x & 0xFFFFFF00, y & 0xFFFFFF00);
+        }
+
+
+        if self.prev_rot.1 {
+            x_byte = 255 - x_byte;
+            y_byte = 255 - y_byte;
+        }
+        if self.prev_rot.0 {
+            let temp = x_byte; x_byte = y_byte; y_byte = temp;
+        }
+
+        return (self.prev_out.0 + x_byte as u32, self.prev_out.1 + y_byte as u32);
+    }
+    pub fn new() -> BytewiseCached {
+        let mut result = BytewiseCached {
+            hilbert: BytewiseHilbert::new(),
+            prev_hi: 0xFFFFFFFFFFFFFFFF,
+            prev_out: (0,0),
+            prev_rot: (false, false),
+        };
+
+        result.detangle(0); // ensures that we set the cached stuff correctly
+        return result;
+    }
+}
 
 pub struct BytewiseHilbert {
     entangle: Vec<u16>,         // entangle[x_byte << 16 + y_byte] -> tangle
@@ -123,13 +306,6 @@ impl BytewiseHilbert {
         return result;
     }
 }
-
-// pub struct BitwiseHilbert;
-//
-// impl BitwiseHilbert {
-//     pub fn entangle(&self, (x, y): (u32, u32)) -> u64 { bit_entangle((x, y)) }
-//     pub fn detangle(&self, tangle: u64) -> (u32, u32) { bit_detangle(tangle) }
-// }
 
 fn bit_entangle(mut pair: (u32, u32)) -> u64 {
     let mut result = 0u64;
