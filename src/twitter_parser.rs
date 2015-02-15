@@ -44,8 +44,8 @@ impl<R:Buffer, RF: Fn() -> R> EdgeMapper for ReaderMapper<R, RF> {
         for readline in reader.lines() {
             let line = readline.ok().expect("read error");
             let elts: Vec<&str> = line.as_slice().words().collect();
-            let src: u32 = elts[0].parse().expect("malformed src");
-            let dst: u32 = elts[1].parse().expect("malformed dst");
+            let src: u32 = elts[0].parse().ok().expect("malformed src");
+            let dst: u32 = elts[1].parse().ok().expect("malformed dst");
             action(src, dst);
         }
     }

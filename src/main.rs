@@ -156,7 +156,7 @@ fn pagerank<G: EdgeMapper>(graph: &G, nodes: u32, alpha: f32)
 
     graph.map_edges(|x, _| { deg[x as usize] += 1f32 });
 
-    for _iteration in (0 .. 10) {
+    for _iteration in (0 .. 20) {
         for node in (0 .. nodes) {
             src[node as usize] = alpha * dst[node as usize] / deg[node as usize];
             dst[node as usize] = 1f32 - alpha;
