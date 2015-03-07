@@ -7,11 +7,13 @@ use std::os::MapOption::{MapReadable, MapFd};
 use std::os::MemoryMap;
 use std::os::unix::prelude::AsRawFd;
 use core::ops;
+use core::marker::PhantomData;
 // use std::slice::AsSlice;
 
 pub struct TypedMemoryMap<T:Copy> {
     map:    MemoryMap,  // mapped file
     len:    usize,      // in bytes (needed because map extends to full block)
+    pha:    PhantomData<T>,
 }
 
 impl<T:Copy> TypedMemoryMap<T> {
@@ -24,13 +26,14 @@ impl<T:Copy> TypedMemoryMap<T> {
         TypedMemoryMap {
             map: MemoryMap::new(size, &[MapReadable, MapFd(file.as_raw_fd())]).ok().expect("unable to map file"),
             len: size,
+            pha: PhantomData,
         }
     }
 }
 
 impl<T:Copy> ops::Index<ops::Range<usize>> for TypedMemoryMap<T> {
     type Output = [T];
-    #[inline] fn index(&self, index: &ops::Range<usize>) -> &[T] { &self[][*index] }
+    #[inline] fn index(&self, index: &ops::Range<usize>) -> &[T] { &self[..][*index] }
 }
 
 impl<T:Copy> ops::Index<ops::RangeFull> for TypedMemoryMap<T> {

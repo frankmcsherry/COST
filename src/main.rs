@@ -1,11 +1,12 @@
-#![feature(io)]
+#![feature(old_io)]
 #![feature(core)]
 #![feature(collections)]
-#![feature(path)]
+#![feature(old_path)]
 #![feature(os)]
 #![feature(test)]
 #![feature(alloc)]
 #![feature(std_misc)]
+#![feature(str_words)]
 
 extern crate alloc;
 extern crate core;
@@ -68,7 +69,7 @@ fn main()
     }
 
     if args.get_bool("compressed") {
-        let graph = DeltaCompressedReaderMapper::new(|&:| BufferedReader::new(File::open_mode(&Path::new(args.get_str("<prefix>")), Open, Read)));
+        let graph = DeltaCompressedReaderMapper::new(|| BufferedReader::new(File::open_mode(&Path::new(args.get_str("<prefix>")), Open, Read)));
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
         if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }

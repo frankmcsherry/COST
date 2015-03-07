@@ -270,7 +270,7 @@ impl BytewiseHilbert {
         let init_x = x;
         let init_y = y;
         let mut result = 0u64;
-        for i in (0us .. 4) {
+        for i in (0 .. 4) {
             let x_byte = (x >> (24 - (8 * i))) as u8;
             let y_byte = (y >> (24 - (8 * i))) as u8;
             result = (result << 16) + self.entangle[(((x_byte as u16) << 8) + y_byte as u16) as usize] as u64;
@@ -309,7 +309,7 @@ impl BytewiseHilbert {
 
 fn bit_entangle(mut pair: (u32, u32)) -> u64 {
     let mut result = 0u64;
-    for log_s_rev in (0us .. 32us) {
+    for log_s_rev in (0 .. 32) {
         let log_s = 31 - log_s_rev;
         let rx = (pair.0 >> log_s) & 1u32;
         let ry = (pair.1 >> log_s) & 1u32;
@@ -322,7 +322,7 @@ fn bit_entangle(mut pair: (u32, u32)) -> u64 {
 
 fn bit_detangle(tangle: u64) -> (u32, u32) {
     let mut result = (0u32, 0u32);
-    for log_s in (0us .. 32us) {
+    for log_s in (0 .. 32) {
         let shifted = ((tangle >> (2 * log_s)) & 3u64) as u32;
 
         let rx = (shifted >> 1) & 1u32;

@@ -21,8 +21,8 @@ impl UpperLowerMemMapper {
 
 impl EdgeMapper for UpperLowerMemMapper {
     fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
-        let mut offset = 0us;
-        for &((u16_x, u16_y), count) in self.upper[].iter() {
+        let mut offset = 0;
+        for &((u16_x, u16_y), count) in self.upper[..].iter() {
             let u16_x = (u16_x as u32) << 16;
             let u16_y = (u16_y as u32) << 16;
             for &(l16_x, l16_y) in self.lower[offset .. offset + count as usize].iter() {
@@ -97,7 +97,7 @@ impl NodesEdgesMemMapper {
 impl EdgeMapper for NodesEdgesMemMapper {
     fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
         let mut offset = 0;
-        for &(node, count) in self.nodes[].iter() {
+        for &(node, count) in self.nodes[..].iter() {
             let limit = offset + count as usize;
             for &edge in self.edges[offset..limit].iter() {
                 action(node, edge);
