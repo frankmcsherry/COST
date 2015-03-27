@@ -16,6 +16,7 @@ extern crate docopt;
 use docopt::Docopt;
 
 use std::cmp::Ordering;
+use std::cmp::max;
 use std::iter::AdditiveIterator;
 
 use std::old_io::{File, Open, Write, Read, BufferedWriter};
@@ -25,7 +26,7 @@ use std::old_io::BufferedReader;
 // use graph_iterator::UpperLowerMapper;
 use graph_iterator::{EdgeMapper, UpperLowerMemMapper, DeltaCompressedReaderMapper, NodesEdgesMemMapper};
 use hilbert_curve::{encode, Decoder, convert_to_hilbert, BytewiseHilbert, to_hilbert, merge};
-use twitter_parser::{ ReaderMapper };
+use twitter_parser::{ ReaderMapper, _parse_to_vertex };
 
 mod typedrw;
 mod hilbert_curve;
@@ -33,14 +34,15 @@ mod graph_iterator;
 mod twitter_parser;
 
 static USAGE: &'static str = "
-Usage: COST stats  (vertex | hilbert | compressed) <prefix>
-       COST print  (vertex | hilbert | compressed) <prefix>
-       COST pagerank  (vertex | hilbert | compressed) <prefix>
+Usage: COST pagerank  (vertex | hilbert | compressed) <prefix>
        COST label_prop (vertex | hilbert | compressed) <prefix>
        COST union_find (vertex | hilbert | compressed) <prefix>
+       COST stats  (vertex | hilbert | compressed) <prefix>
+       COST print  (vertex | hilbert | compressed) <prefix>
        COST to_hilbert [--dense] <prefix>
        COST parse_to_hilbert
        COST merge <source>...
+       COST twitter <from> <prefix>
 ";
 
 
@@ -48,33 +50,31 @@ fn main()
 {
     let args = Docopt::new(USAGE).and_then(|dopt| dopt.parse()).unwrap_or_else(|e| e.exit());
 
-    let nodes = 3563602788 + 1; //65000000;
-
     if args.get_bool("vertex") {
         let graph = NodesEdgesMemMapper::new(args.get_str("<prefix>"));
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
-        if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
-        if args.get_bool("label_prop") { label_propagation(&graph, nodes); }
-        if args.get_bool("union_find") { union_find(&graph, nodes); }
+        if args.get_bool("pagerank") { pagerank(&graph, stats(&graph), 0.85f32); }
+        if args.get_bool("label_prop") { label_propagation(&graph, stats(&graph)); }
+        if args.get_bool("union_find") { union_find(&graph, stats(&graph)); }
     }
 
     if args.get_bool("hilbert") {
         let graph = UpperLowerMemMapper::new(args.get_str("<prefix>"));
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
-        if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
-        if args.get_bool("label_prop") { label_propagation(&graph, nodes); }
-        if args.get_bool("union_find") { union_find(&graph, nodes); }
+        if args.get_bool("pagerank") { pagerank(&graph, stats(&graph), 0.85f32); }
+        if args.get_bool("label_prop") { label_propagation(&graph, stats(&graph)); }
+        if args.get_bool("union_find") { union_find(&graph, stats(&graph)); }
     }
 
     if args.get_bool("compressed") {
         let graph = DeltaCompressedReaderMapper::new(|| BufferedReader::new(File::open_mode(&Path::new(args.get_str("<prefix>")), Open, Read)));
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
-        if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
-        if args.get_bool("label_prop") { label_propagation(&graph, nodes); }
-        if args.get_bool("union_find") { union_find(&graph, nodes); }
+        if args.get_bool("pagerank") { pagerank(&graph, stats(&graph), 0.85f32); }
+        if args.get_bool("label_prop") { label_propagation(&graph, stats(&graph)); }
+        if args.get_bool("union_find") { union_find(&graph, stats(&graph)); }
     }
     // if args.get_bool("secret") {
     //     let graph = UpperLowerMapper::new(args.get_str("<prefix>"));
@@ -127,9 +127,13 @@ fn main()
             prev = next;
         });
     }
+
+	if args.get_bool("twitter") {
+		_parse_to_vertex(args.get_str("<from>"),args.get_str("<prefix>"))
+	}
 }
 
-fn stats<G: EdgeMapper>(graph: &G) {
+fn stats<G: EdgeMapper>(graph: &G) -> u32{
     let mut max_x = 0;
     let mut max_y = 0;
     let mut edges = 0;
@@ -142,6 +146,7 @@ fn stats<G: EdgeMapper>(graph: &G) {
     println!("max x: {}", max_x);
     println!("max y: {}", max_y);
     println!("edges: {}", edges);
+	std::cmp::max(max_x, max_y) + 1
 }
 
 fn print<G: EdgeMapper>(graph: &G) {
@@ -158,6 +163,7 @@ fn pagerank<G: EdgeMapper>(graph: &G, nodes: u32, alpha: f32)
     graph.map_edges(|x, _| { deg[x as usize] += 1f32 });
 
     for _iteration in (0 .. 20) {
+        println!("Iteration: {}", _iteration);
         for node in (0 .. nodes) {
             src[node as usize] = alpha * dst[node as usize] / deg[node as usize];
             dst[node as usize] = 1f32 - alpha;
