@@ -15,15 +15,43 @@ which should result in usage information indicating appropriate arguments:
 Running `target/COST`
 Invalid arguments.
 
-Usage: COST pagerank  (vertex | hilbert) <prefix>
-       COST label_prop (vertex | hilbert) <prefix>
-       COST union_find (vertex | hilbert) <prefix>
+Usage: COST pagerank  (vertex | hilbert | compressed) <prefix>
+       COST label_prop (vertex | hilbert | compressed) <prefix>
+       COST union_find (vertex | hilbert | compressed) <prefix>
+       COST stats  (vertex | hilbert | compressed) <prefix>
+       COST print  (vertex | hilbert | compressed) <prefix>
        COST to_hilbert [--dense] <prefix>
+       COST parse_to_hilbert
+       COST merge <source>...
+       COST twitter <from> <prefix>
 ```
-The first three modes correspond to the three graph algorithms. The second parameter indicates the binary graph layout. The final parameter must be a path prefix for which certain extensions exist as files, discussed in a moment. The fourth mode performs a graph layout according to a Hilbert space-filling curve, optionally densifying the identifiers, and prints the results to the screen (you must edit the code to write the data back to your computer).
+The first three modes correspond to the three graph algorithms. The second parameter indicates the binary graph layout. The final parameter must be a path prefix for which certain extensions exist as files, discussed in a moment. The to_hilbert mode performs a graph layout according to a Hilbert space-filling curve, optionally densifying the identifiers.
 
 ## Graph input
 The computation will not do anything productive without graph data, and the graph data use for experiments (processed versions of the graphs linked above) are too large to host here. I'm also not wild about distributing programs that write data back to someone else's computer, without more serious review. That being said, the file `src/twitter_parser.rs` contains the code that I used to parse `twitter_rv.net`, the file you get from the link above.
+
+You can find the twitter files by searching for "twitter_rv.tar.gz" (6GB), "twitter_rv_19000000.tar.gz" (764MB) or "twitter_rv_small.tar.gz" (188MB). The sizes listed refer to the compressed size.
+
+To process the small twitter dataset into a set of small.nodes and small.edges files, you can run:
+
+```
+./target/release/COST twitter twitter_rv_15066953.net small
+```
+
+To convert the small.nodes and small.edges file to hilbert, you can run:
+
+```
+./target/release/COST to_hilbert small
+```
+
+Which will create two files, small.upper and small.lower.
+
+To compute pagerank, you can run:
+
+```
+./target/release/COST pagerank hilbert small
+```
+
 
 The required graph layout is quite simple (as is the code to parse it), and you should be able to write out your own graph data if you would like to try out the code.
 
@@ -39,7 +67,8 @@ The `hilbert` option requires a `<prefix>` for which `<prefix>.upper` and `<pref
 *   `<prefix>.upper` contains a sequence of `((u16, u16), u32)` values, indicating a pair of upper 16 bits of node identifiers, and a count of how many edges have this pair of upper 16 bits.
 *   `<prefix>.lower` contains a concatenated sequence of `(u16, u16)` values for the lower 16 bits for each edge in each group above.
 
-The easiest way to get a feel for what these should look like is to invoke the `to_hilbert` option with `<prefix>` valid for data in the `vertex` layout, and it will print to the screen what the data look like laid out in Hilbert format. If you change the code to write the data to disk rather than to the terminal, you should be good to go (remember, `.upper` and `.lower`, not `.nodes` and `.edges`).
+The easiest way to get a feel for what these should look like is to invoke the `to_hilbert` option with `<prefix>` valid for data in the `vertex` layout, and it will print to the screen what the data look like laid out in Hilbert format.
+If you change the code to write the data to disk rather than to the terminal, you should be good to go (remember, `.upper` and `.lower`, not `.nodes` and `.edges`).
 
 ## Notes
 
