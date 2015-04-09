@@ -1,32 +1,29 @@
-#![feature(old_io)]
+// #![feature(old_io)]
 #![feature(core)]
-#![feature(collections)]
-#![feature(old_path)]
-#![feature(os)]
 #![feature(test)]
 #![feature(alloc)]
-#![feature(std_misc)]
 #![feature(str_words)]
 
+extern crate mmap;
 extern crate alloc;
 extern crate core;
 extern crate test;
+extern crate byteorder;
 
 extern crate docopt;
 use docopt::Docopt;
 
 use std::cmp::Ordering;
 use std::cmp::max;
-use std::iter::AdditiveIterator;
+// use std::iter::AdditiveIterator;
 
-use std::old_io::{File, Open, Write, Read, BufferedWriter};
-use std::old_io::stdio::{stdin, stdout};
-use std::old_io::BufferedReader;
+use std::fs::File;
 
-// use graph_iterator::UpperLowerMapper;
-use graph_iterator::{EdgeMapper, UpperLowerMemMapper, DeltaCompressedReaderMapper, NodesEdgesMemMapper};
+use graph_iterator::{EdgeMapper, DeltaCompressedReaderMapper, NodesEdgesMemMapper, UpperLowerMemMapper};
 use hilbert_curve::{encode, Decoder, convert_to_hilbert, BytewiseHilbert, to_hilbert, merge};
 use twitter_parser::{ ReaderMapper, _parse_to_vertex };
+use std::io::{BufReader, BufWriter, stdin, stdout};
+use byteorder::{WriteBytesExt, LittleEndian};
 
 mod typedrw;
 mod hilbert_curve;
@@ -46,12 +43,15 @@ Usage: COST pagerank  (vertex | hilbert | compressed) <prefix>
 ";
 
 
-fn main()
-{
+fn main() {
     let args = Docopt::new(USAGE).and_then(|dopt| dopt.parse()).unwrap_or_else(|e| e.exit());
 
     if args.get_bool("vertex") {
         let graph = NodesEdgesMemMapper::new(args.get_str("<prefix>"));
+        // let graph = NodesEdgesMapper {
+        //     nodes: || File::open(format!("{}.nodes", args.get_str("<prefix>"))).unwrap(),
+        //     edges: || File::open(format!("{}.edges", args.get_str("<prefix>"))).unwrap(),
+        // };
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
         if args.get_bool("pagerank") { pagerank(&graph, stats(&graph), 0.85f32); }
@@ -61,6 +61,10 @@ fn main()
 
     if args.get_bool("hilbert") {
         let graph = UpperLowerMemMapper::new(args.get_str("<prefix>"));
+        // let graph = UpperLowerMapper {
+        //     upper: || File::open(format!("{}.nodes", args.get_str("<prefix>"))).unwrap(),
+        //     lower: || File::open(format!("{}.edges", args.get_str("<prefix>"))).unwrap(),
+        // };
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
         if args.get_bool("pagerank") { pagerank(&graph, stats(&graph), 0.85f32); }
@@ -69,41 +73,39 @@ fn main()
     }
 
     if args.get_bool("compressed") {
-        let graph = DeltaCompressedReaderMapper::new(|| BufferedReader::new(File::open_mode(&Path::new(args.get_str("<prefix>")), Open, Read)));
+        let graph = DeltaCompressedReaderMapper::new(|| BufReader::new(File::open(args.get_str("<prefix>")).unwrap()));
         if args.get_bool("stats") { stats(&graph); }
         if args.get_bool("print") { print(&graph); }
         if args.get_bool("pagerank") { pagerank(&graph, stats(&graph), 0.85f32); }
         if args.get_bool("label_prop") { label_propagation(&graph, stats(&graph)); }
         if args.get_bool("union_find") { union_find(&graph, stats(&graph)); }
     }
-    // if args.get_bool("secret") {
-    //     let graph = UpperLowerMapper::new(args.get_str("<prefix>"));
-    //     if args.get_bool("pagerank") { pagerank(&graph, nodes, 0.85f32); }
-    //     if args.get_bool("labelprop") { label_propagation(&graph, nodes); }
-    //     if args.get_bool("unionfind") { union_find(&graph, nodes); }
-    // }
 
     if args.get_bool("to_hilbert") {
         let prefix = args.get_str("<prefix>");
-        let graph = NodesEdgesMemMapper::new(prefix);
+        let graph = NodesEdgesMemMapper::new(args.get_str("<prefix>"));
+        // let graph = NodesEdgesMapper {
+        //     nodes: || File::open(format!("{}.nodes", prefix)).unwrap(),
+        //     edges: || File::open(format!("{}.edges", prefix)).unwrap(),
+        // };
 
-        let mut u_writer = BufferedWriter::new(File::open_mode(&Path::new(format!("{}.upper", prefix)), Open, Write).ok().expect("err"));
-        let mut l_writer = BufferedWriter::new(File::open_mode(&Path::new(format!("{}.lower", prefix)), Open, Write).ok().expect("err"));
+        let mut u_writer = BufWriter::new(File::create(format!("{}.upper", prefix)).unwrap());
+        let mut l_writer = BufWriter::new(File::create(format!("{}.lower", prefix)).unwrap());
 
         convert_to_hilbert(&graph, args.get_bool("--dense"), |ux, uy, c, ls| {
-            u_writer.write_le_u16(ux).ok().expect("err");
-            u_writer.write_le_u16(uy).ok().expect("err");
-            u_writer.write_le_u32(c).ok().expect("err");
+            u_writer.write_u16::<LittleEndian>(ux).unwrap();
+            u_writer.write_u16::<LittleEndian>(uy).unwrap();
+            u_writer.write_u32::<LittleEndian>(c).unwrap();
             for &(lx, ly) in ls.iter(){
-                l_writer.write_le_u16(lx).ok().expect("err");
-                l_writer.write_le_u16(ly).ok().expect("err");
+                l_writer.write_u16::<LittleEndian>(lx).unwrap();
+                l_writer.write_u16::<LittleEndian>(ly).unwrap();
             }
         });
     }
 
     if args.get_bool("parse_to_hilbert") {
-        let reader_mapper = ReaderMapper { reader: || BufferedReader::new(stdin())};
-        let mut writer = BufferedWriter::new(stdout());
+        let reader_mapper = ReaderMapper { reader: || BufReader::new(stdin())};
+        let mut writer = BufWriter::new(stdout());
 
         let mut prev = 0u64;
         to_hilbert(&reader_mapper, |next| {
@@ -114,10 +116,10 @@ fn main()
     }
 
     if args.get_bool("merge") {
-        let mut writer = BufferedWriter::new(stdout());
+        let mut writer = BufWriter::new(stdout());
         let mut vector = Vec::new();
         for &source in args.get_vec("<source>").iter() {
-            vector.push(Decoder::new(BufferedReader::new(File::open_mode(&Path::new(source), Open, Read))));
+            vector.push(Decoder::new(BufReader::new(File::open(source).unwrap())));
         }
 
         let mut prev = 0u64;
@@ -215,9 +217,8 @@ fn union_find<G: EdgeMapper>(graph: &G, nodes: u32)
 fn label_propagation<G: EdgeMapper>(graph: &G, nodes: u32)
 {
     let mut label: Vec<u32> = (0..nodes).collect();
-
-    let mut old_sum = label.iter().map(|x| *x as u64).sum() + 1;
-    let mut new_sum = label.iter().map(|x| *x as u64).sum();
+    let mut old_sum = label.iter().map(|x| *x as u64).sum::<u64>() + 1;
+    let mut new_sum = label.iter().map(|x| *x as u64).sum::<u64>();
 
     while new_sum < old_sum {
         graph.map_edges(|src, dst| {

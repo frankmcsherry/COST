@@ -1,12 +1,11 @@
+use std::io::{Read, Write};
 use std::collections::HashMap;
 use graph_iterator::EdgeMapper;
-// use typedrw::TypedMemoryMap;
-#[test] use std::old_io::{MemWriter, MemReader};
+use byteorder::{ReadBytesExt, WriteBytesExt};
 
 #[inline]
-pub fn encode<W: Writer>(writer: &mut W, diff: u64) {
+pub fn encode<W: Write>(writer: &mut W, diff: u64) {
     assert!(diff > 0);
-    // let mut temp = MemWriter::new();
     for &shift in [56, 48, 40, 32, 24, 16, 8].iter() {
         if (diff >> shift) != 0 {
             writer.write_u8(0u8).ok().expect("write error");
@@ -21,8 +20,8 @@ pub fn encode<W: Writer>(writer: &mut W, diff: u64) {
 }
 
 #[inline]
-pub fn decode<R: Reader>(reader: &mut R) -> Option<u64> {
-    if let Ok(mut read) = reader.read_u8 () {
+pub fn decode<R: Read>(reader: &mut R) -> Option<u64> {
+    if let Ok(mut read) = reader.read_u8() {
         let mut count = 0u64;
         while read == 0 {
             count += 1;
@@ -56,18 +55,18 @@ fn test_encode_decode() {
     assert_eq!(test_vec, test_out);
 }
 
-pub struct Decoder<R: Reader> {
+pub struct Decoder<R: Read> {
     reader:     R,
     current:    u64,
 }
 
-impl<R: Reader> Decoder<R> {
+impl<R: Read> Decoder<R> {
     pub fn new(reader: R) -> Decoder<R> {
         Decoder { reader: reader, current: 0 }
     }
 }
 
-impl<R: Reader> Iterator for Decoder<R> {
+impl<R: Read> Iterator for Decoder<R> {
     type Item = u64;
     fn next(&mut self) -> Option<u64> {
         if let Some(diff) = decode(&mut self.reader) {
@@ -111,8 +110,7 @@ where I : EdgeMapper,
         let upper = (entangled >> 32) as u32;
         let lower = entangled as u32;
 
-        if !uppers.contains_key(&upper) { uppers.insert(upper, Vec::new()); }
-        uppers[upper].push(lower);
+        uppers.entry(upper).or_insert(Vec::new()).push(lower);
     });
 
     let mut keys: Vec<u32> = uppers.keys().map(|x|x.clone()).collect();
