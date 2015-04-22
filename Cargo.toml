@@ -5,6 +5,6 @@ version = "0.0.1"
 authors = ["Frank McSherry <fmcsherry@me.com>"]
 
 [dependencies]
-docopt="0.6.59"
-byteorder="0.3.5"
+docopt="*"
+byteorder="*"
 mmap="*"

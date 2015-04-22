@@ -2,11 +2,6 @@ use std::io::Read;
 use hilbert_curve::BytewiseCached;
 use typedrw::TypedMemoryMap;
 
-// use std::mem;
-// use std::cmp::min;
-// use std::io::Result;
-// use core::raw::Slice as RawSlice;
-
 pub trait EdgeMapper {
     fn map_edges<F: FnMut(u32, u32) -> ()>(&self, action: F) -> ();
 }

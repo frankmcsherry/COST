@@ -1,13 +1,12 @@
-// #![feature(old_io)]
-#![feature(core)]
-#![feature(test)]
-#![feature(alloc)]
-#![feature(str_words)]
+// #![feature(core)]
+// #![feature(test)]
+// #![feature(alloc)]
+// #![feature(str_words)]
 
 extern crate mmap;
-extern crate alloc;
-extern crate core;
-extern crate test;
+// extern crate alloc;
+// extern crate core;
+// extern crate test;
 extern crate byteorder;
 
 extern crate docopt;
@@ -15,7 +14,6 @@ use docopt::Docopt;
 
 use std::cmp::Ordering;
 use std::cmp::max;
-// use std::iter::AdditiveIterator;
 
 use std::fs::File;
 
@@ -217,8 +215,8 @@ fn union_find<G: EdgeMapper>(graph: &G, nodes: u32)
 fn label_propagation<G: EdgeMapper>(graph: &G, nodes: u32)
 {
     let mut label: Vec<u32> = (0..nodes).collect();
-    let mut old_sum = label.iter().map(|x| *x as u64).sum::<u64>() + 1;
-    let mut new_sum = label.iter().map(|x| *x as u64).sum::<u64>();
+    let mut old_sum: u64 = label.iter().fold(0, |t,x| t + *x as u64) + 1;
+    let mut new_sum: u64 = label.iter().fold(0, |t,x| t + *x as u64);
 
     while new_sum < old_sum {
         graph.map_edges(|src, dst| {
@@ -230,7 +228,7 @@ fn label_propagation<G: EdgeMapper>(graph: &G, nodes: u32)
         });
 
         old_sum = new_sum;
-        new_sum = label.iter().map(|x| *x as u64).sum();
+        new_sum = label.iter().fold(0, |t,x| t + *x as u64);
         println!("iteration");
     }
 
