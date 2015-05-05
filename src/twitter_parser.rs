@@ -43,7 +43,7 @@ impl<R:BufRead, RF: Fn() -> R> EdgeMapper for ReaderMapper<R, RF> {
         let reader = (self.reader)();
         for readline in reader.lines() {
             let line = readline.ok().expect("read error");
-            let elts: Vec<&str> = line[..].split(" ").collect();
+            let elts: Vec<&str> = line[..].split_whitespace().collect();
             let src: u32 = elts[0].parse().ok().expect("malformed src");
             let dst: u32 = elts[1].parse().ok().expect("malformed dst");
             action(src, dst);
