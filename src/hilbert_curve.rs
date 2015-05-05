@@ -41,13 +41,13 @@ pub fn decode<R: Read>(reader: &mut R) -> Option<u64> {
 #[test]
 fn test_encode_decode() {
     let test_vec = vec![1, 2, 1 << 20, 1 << 60];
-    let mut writer = MemWriter::new();
+    let mut writer = Vec::new();
     for &elt in test_vec.iter() {
         encode(&mut writer, elt);
     }
 
     let mut test_out = Vec::new();
-    let mut reader = MemReader::new(writer.into_inner());
+    let mut reader = &writer[..];
     while let Some(elt) = decode(&mut reader) {
         test_out.push(elt);
     }
