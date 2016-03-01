@@ -30,6 +30,10 @@ impl<R: Read, F: Fn()->R> EdgeMapper for DeltaCompressedReaderMapper<R, F> {
 
         let mut buffer = vec![0u8; 1 << 16];
         while let Ok(read) = reader.read(&mut buffer[..]) {
+            if read == 0 {
+                // Reached EOF.
+                break;
+            }
             for &byte in &buffer[..read] {
                 if byte == 0 && delta == 0 {
                     depth += 1;
