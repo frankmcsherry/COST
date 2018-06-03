@@ -25,13 +25,13 @@ The most common first binary to use is `to_vertex`, which creates a binary repre
 
 If you acquire some excellent graph data, you could for example type
 
-    Echidnatron% cargo run --release --bin to_vertex -- my_graph.txt my_graph
+    % cargo run --release --bin to_vertex -- my_graph.txt my_graph
 
 which will create files `my_graph.nodes` and `my_graph.edges`. These files will generally be smaller than the textual representation, though the `.nodes` file will use space proportional to the largest vertex identifier.
 
 Once you have ingressed some graph data, you can also re-arrange the data according to a Hilbert curve, which is an excellent bit of mathematics you can search for and read about if you so care.
 
-    Echidnatron% cargo run --release --bin to_hilbert -- my_graph
+    % cargo run --release --bin to_hilbert -- my_graph
 
 will produce `my_graph.upper` and `my_graph.lower` for pre-existing `my_graph.nodes` and `my_graph.edges`. The Hilbert representation can be even a bit tighter, and often has improved performance for several of the algorithms.
 
