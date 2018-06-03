@@ -6,69 +6,48 @@ Specifically, this repository contains single-threaded implementations of three 
 
 ## Instructions
 
-Once cloned, the project can be built and run by typing
-```
-cargo run --release
-```
-which should result in usage information indicating appropriate arguments:
-```
-Running `target/COST`
-Invalid arguments.
+The project consists of several independent binaries and a supporting library. The `src/bin/` directory has one file for each binary, each of which can be executed by typing
 
-Usage: COST pagerank  (vertex | hilbert | compressed) <prefix>
-       COST label_prop (vertex | hilbert | compressed) <prefix>
-       COST union_find (vertex | hilbert | compressed) <prefix>
-       COST stats  (vertex | hilbert | compressed) <prefix>
-       COST print  (vertex | hilbert | compressed) <prefix>
-       COST to_hilbert [--dense] <prefix>
-       COST parse_to_hilbert
-       COST merge <source>...
-       COST twitter <from> <prefix>
-```
-The first three modes correspond to the three graph algorithms. The second parameter indicates the binary graph layout. The final parameter must be a path prefix for which certain extensions exist as files, discussed in a moment. The to_hilbert mode performs a graph layout according to a Hilbert space-filling curve, optionally densifying the identifiers.
+    cargo run --release --bin <binary_name> -- <arguments>
 
-## Graph input
-The computation will not do anything productive without graph data, and the graph data use for experiments (processed versions of the graphs linked above) are too large to host here. I'm also not wild about distributing programs that write data back to someone else's computer, without more serious review. That being said, the file `src/twitter_parser.rs` contains the code that I used to parse `twitter_rv.net`, the file you get from the link above.
+All binaries take at least one argument, and can be run with zero arguments to present their usage (and any warnings about files that may be overwritten as a result of executing the binary).
 
-You can find the twitter files by searching for "twitter_rv.tar.gz" (6GB), "twitter_rv_19000000.tar.gz" (764MB) or "twitter_rv_small.tar.gz" (188MB). The sizes listed refer to the compressed size.
+### Introducing graph data
 
-To process the small twitter dataset into a set of small.nodes and small.edges files, you can run:
+The most common first binary to use is `to_vertex`, which creates a binary representation of data presented as a textual list of pairs of vertex identifiers (one per line). You should be able to type:
 
-```
-./target/release/COST twitter twitter_rv_15066953.net small
-```
+    % cargo run --release --bin to_vertex
+        Finished release [optimized] target(s) in 0.0 secs
+         Running `target/release/to_vertex`
+    Usage: to_vertex <source> <prefix>
+    NOTE: <prefix>.nodes and <prefix>.edges will be overwritten.
+    %
 
-To convert the small.nodes and small.edges file to hilbert, you can run:
+If you acquire some excellent graph data, you could for example type
 
-```
-./target/release/COST to_hilbert small
-```
+    Echidnatron% cargo run --release --bin to_vertex -- my_graph.txt my_graph
 
-Which will create two files, small.upper and small.lower.
+which will create files `my_graph.nodes` and `my_graph.edges`. These files will generally be smaller than the textual representation, though the `.nodes` file will use space proportional to the largest vertex identifier.
 
-To compute pagerank, you can run:
+Once you have ingressed some graph data, you can also re-arrange the data according to a Hilbert curve, which is an excellent bit of mothematics you can search for and read about if you so care.
 
-```
-./target/release/COST pagerank hilbert small
-```
+    Echidnatron% cargo run --release --bin to_hilbert -- my_graph
 
+will produce `my_graph.upper` and `my_graph.lower` for pre-existing `my_graph.nodes` and `my_graph.edges`. The Hilbert representation can be even a bit tighter, and often has improved performance for several of the algorithms.
 
-The required graph layout is quite simple (as is the code to parse it), and you should be able to write out your own graph data if you would like to try out the code.
+### Graph algorithms
 
-The `vertex` option requires a `<prefix>` for which files `<prefix>.nodes` and `<prefix>.edges` exist. The two files should be binary, where
+There are three algorithms here: pagerank, label propagation, and union find. Each has their own binary, and each expects you to supply three arguments: the "mode", which is one of `vertex`, `hilbert`, and `compressed`, the graph filename prefix, and a number greater than the largest vertex identifier (a size for per-vertex state allocation). If you don't know the last number, the `stats` binary can help you out by scanning the graph for you.
 
-*   `<prefix>.nodes` contains a sequence of `(u32, u32)` pairs representing `(node_id, degree)`.
-*   `<prefix>.edges` contains a sequence of `u32` values indicating the concatenation of edge destinations for all nodes indicated above.
+For example,
 
-The program is just going to map these two files into memory and read them, so you want to make sure that data have the appropriate endian-ness for your system.
+    % cargo run --release --bin union_find -- hilbert ./friendster 66000000
+        Finished release [optimized] target(s) in 0.0 secs
+         Running `target/release/union_find hilbert ./friendster 66000000`
+    65608365 non-roots found
+    %
 
-The `hilbert` option requires a `<prefix>` for which `<prefix>.upper` and `<prefix>.lower` exist. The two files should be binary, where
-
-*   `<prefix>.upper` contains a sequence of `((u16, u16), u32)` values, indicating a pair of upper 16 bits of node identifiers, and a count of how many edges have this pair of upper 16 bits.
-*   `<prefix>.lower` contains a concatenated sequence of `(u16, u16)` values for the lower 16 bits for each edge in each group above.
-
-The easiest way to get a feel for what these should look like is to invoke the `to_hilbert` option with `<prefix>` valid for data in the `vertex` layout, and it will print to the screen what the data look like laid out in Hilbert format.
-If you change the code to write the data to disk rather than to the terminal, you should be good to go (remember, `.upper` and `.lower`, not `.nodes` and `.edges`).
+which reports the number of nodes in the graph minus the number of connected components.
 
 ## Notes
 

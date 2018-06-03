@@ -3,7 +3,7 @@ use hilbert_curve::BytewiseCached;
 use typedrw::TypedMemoryMap;
 
 pub trait EdgeMapper {
-    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, action: F) -> ();
+    fn map_edges<F: FnMut(u32, u32)>(&self, action: F);
 }
 
 pub struct DeltaCompressedReaderMapper<R: Read, F: Fn()->R> {
@@ -19,7 +19,7 @@ impl<R: Read, F: Fn()->R> DeltaCompressedReaderMapper<R, F> {
 }
 
 impl<R: Read, F: Fn()->R> EdgeMapper for DeltaCompressedReaderMapper<R, F> {
-    fn map_edges<A: FnMut(u32, u32) -> ()>(&self, mut action: A) -> () {
+    fn map_edges<A: FnMut(u32, u32)>(&self, mut action: A) {
 
         let mut hilbert = BytewiseCached::new();
         let mut current = 0u64;
@@ -30,6 +30,8 @@ impl<R: Read, F: Fn()->R> EdgeMapper for DeltaCompressedReaderMapper<R, F> {
 
         let mut buffer = vec![0u8; 1 << 16];
         while let Ok(read) = reader.read(&mut buffer[..]) {
+            if read == 0 { return; }
+
             for &byte in &buffer[..read] {
                 if byte == 0 && delta == 0 {
                     depth += 1;
@@ -46,6 +48,55 @@ impl<R: Read, F: Fn()->R> EdgeMapper for DeltaCompressedReaderMapper<R, F> {
                         depth -= 1;
                     }
                 }
+            }
+        }
+    }
+}
+
+pub struct DeltaCompressedSliceMapper<'a> {
+    slice: &'a [u8],
+}
+
+impl<'a> DeltaCompressedSliceMapper<'a> {
+    pub fn new(slice: &'a [u8]) -> DeltaCompressedSliceMapper<'a> {
+        DeltaCompressedSliceMapper {
+            slice: slice,
+        }
+    }
+}
+
+impl<'a> EdgeMapper for DeltaCompressedSliceMapper<'a> {
+    fn map_edges<A: FnMut(u32, u32)>(&self, mut action: A) {
+
+        let mut hilbert = BytewiseCached::new();
+        let mut current = 0u64;
+
+        let mut cursor = 0;
+        while cursor < self.slice.len() {
+            let byte = unsafe { *self.slice.get_unchecked(cursor) };
+            cursor += 1;
+
+            if byte > 0 {
+                current += byte as u64;
+                let (x,y) = hilbert.detangle(current);
+                action(x,y);
+            }
+            else {
+                let mut depth = 2;
+                while unsafe { *self.slice.get_unchecked(cursor) } == 0 {
+                    cursor += 1;
+                    depth += 1;
+                }
+                let mut delta = 0u64;
+                while depth > 0 {
+                    delta = (delta << 8) + (unsafe { *self.slice.get_unchecked(cursor) } as u64);
+                    cursor += 1;
+                    depth -= 1;
+                }
+
+                current += delta;
+                let (x,y) = hilbert.detangle(current);
+                action(x,y);
             }
         }
     }
@@ -139,7 +190,7 @@ impl UpperLowerMemMapper {
 }
 
 impl EdgeMapper for UpperLowerMemMapper {
-    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
+    fn map_edges<F: FnMut(u32, u32)>(&self, mut action: F) {
         let mut slice = &self.lower[..];
         for &((u16_x, u16_y), count) in &self.upper[..] {
             let u16_x = (u16_x as u32) << 16;
@@ -168,7 +219,7 @@ impl NodesEdgesMemMapper {
 }
 
 impl EdgeMapper for NodesEdgesMemMapper {
-    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
+    fn map_edges<F: FnMut(u32, u32)>(&self, mut action: F) {
         let mut slice = &self.edges[..];
         for &(node, count) in &self.nodes[..] {
             for &edge in &slice[.. count as usize] {
@@ -176,6 +227,28 @@ impl EdgeMapper for NodesEdgesMemMapper {
             }
 
             slice = &slice[count as usize ..];
+        }
+    }
+}
+
+// use std::fs::File;
+// use byteorder::{WriteBytesExt, LittleEndian};
+
+pub struct ReaderMapper<B: ::std::io::BufRead, F: Fn() -> B> {
+    pub reader: F,
+}
+
+impl<R: ::std::io::BufRead, RF: Fn() -> R> EdgeMapper for ReaderMapper<R, RF> {
+    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
+        let reader = (self.reader)();
+        for readline in reader.lines() {
+            let line = readline.ok().expect("read error");
+            if !line.starts_with('#') {
+                let mut elts = line[..].split_whitespace();
+                let src: u32 = elts.next().unwrap().parse().ok().expect("malformed src");
+                let dst: u32 = elts.next().unwrap().parse().ok().expect("malformed dst");
+                action(src, dst);
+            }
         }
     }
 }

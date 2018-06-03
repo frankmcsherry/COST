@@ -1,11 +1,22 @@
-use std::io::{BufRead, BufReader, BufWriter};
+extern crate byteorder;
+extern crate COST;
+
+use std::io::{BufReader, BufWriter};
 use std::fs::File;
-use graph_iterator::EdgeMapper;
+use COST::graph_iterator::{EdgeMapper, ReaderMapper};
 use byteorder::{WriteBytesExt, LittleEndian};
 
-// source should be something like "path/to/twitter_rv.net"
-// target should be so that you don't mind having "target.nodes" and "target.edges" clobbered.
-pub fn _parse_to_vertex(source: &str, target: &str) {
+fn main() {
+
+    if std::env::args().len() != 3 {
+        println!("Usage: to_vertex <source> <prefix>");
+        println!("NOTE: <prefix>.nodes and <prefix>.edges will be overwritten.");
+        return;
+    }
+
+    let source = std::env::args().nth(1).expect("source unavailable"); let source = &source;
+    let target = std::env::args().nth(2).expect("prefix unavailable"); let target = &target;
+
     let reader_mapper = ReaderMapper { reader: || BufReader::new(File::open(source).unwrap()) };
 
     let mut edge_writer = BufWriter::new(File::create(format!("{}.edges", target)).unwrap());
@@ -31,22 +42,5 @@ pub fn _parse_to_vertex(source: &str, target: &str) {
     if cnt > 0 {
         node_writer.write_u32::<LittleEndian>(src).ok().expect("write error");
         node_writer.write_u32::<LittleEndian>(cnt).ok().expect("write error");
-    }
-}
-
-pub struct ReaderMapper<B: BufRead, F: Fn() -> B> {
-    pub reader: F,
-}
-
-impl<R:BufRead, RF: Fn() -> R> EdgeMapper for ReaderMapper<R, RF> {
-    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
-        let reader = (self.reader)();
-        for readline in reader.lines() {
-            let line = readline.ok().expect("read error");
-            let elts: Vec<&str> = line[..].split_whitespace().collect();
-            let src: u32 = elts[0].parse().ok().expect("malformed src");
-            let dst: u32 = elts[1].parse().ok().expect("malformed dst");
-            action(src, dst);
-        }
     }
 }

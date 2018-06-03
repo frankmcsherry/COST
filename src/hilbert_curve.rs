@@ -29,7 +29,7 @@ pub fn decode<R: Read>(reader: &mut R) -> Option<u64> {
         }
 
         let mut diff = read as u64;
-        for _ in (0..count) {
+        for _ in 0..count {
             diff = (diff << 8) + (reader.read_u8().unwrap() as u64);
         }
 
@@ -102,8 +102,11 @@ where I : EdgeMapper,
         if make_dense {
             while names.len() as u32 <= node { names.push(-1i32); }
             while names.len() as u32 <= edge { names.push(-1i32); }
-            if names[node as usize] == -1i32 { names[node as usize] = names_count; node = names_count as u32; names_count += 1; }
-            if names[edge as usize] == -1i32 { names[edge as usize] = names_count; edge = names_count as u32; names_count += 1; }
+            if names[node as usize] == -1i32 { names[node as usize] = names_count; names_count += 1; }
+            if names[edge as usize] == -1i32 { names[edge as usize] = names_count; names_count += 1; }
+
+            node = names[node as usize] as u32;
+            edge = names[edge as usize] as u32;
         }
 
         let entangled = hilbert.entangle((node as u32, edge as u32));
@@ -188,8 +191,9 @@ pub struct BytewiseCached {
 }
 
 impl BytewiseCached {
+    #[inline(always)]
     pub fn detangle(&mut self, tangle: u64) -> (u32, u32) {
-        let (mut x_byte, mut y_byte) = self.hilbert.detangle[tangle as u16 as usize];
+        let (mut x_byte, mut y_byte) = unsafe { *self.hilbert.detangle.get_unchecked(tangle as u16 as usize) };
 
         // validate self.prev_rot, self.prev_out
         if self.prev_hi != (tangle >> 16) {
@@ -245,8 +249,8 @@ impl BytewiseHilbert {
         let mut entangle = Vec::new();
         let mut detangle: Vec<_> = (0..65536).map(|_| (0u8, 0u8)).collect();
         let mut rotation = Vec::new();
-        for x in (0u32..256) {
-            for y in (0u32..256) {
+        for x in 0u32..256 {
+            for y in 0u32..256 {
                 let entangled = bit_entangle(((x << 24), (y << 24) + (1 << 23)));
                 entangle.push((entangled >> 48) as u16);
                 detangle[(entangled >> 48) as usize] = (x as u8, y as u8);
@@ -268,7 +272,7 @@ impl BytewiseHilbert {
         let init_x = x;
         let init_y = y;
         let mut result = 0u64;
-        for i in (0 .. 4) {
+        for i in 0..4 {
             let x_byte = (x >> (24 - (8 * i))) as u8;
             let y_byte = (y >> (24 - (8 * i))) as u8;
             result = (result << 16) + self.entangle[(((x_byte as u16) << 8) + y_byte as u16) as usize] as u64;
@@ -281,10 +285,11 @@ impl BytewiseHilbert {
         return result;
     }
 
+    #[inline(always)]
     pub fn detangle(&self, tangle: u64) -> (u32, u32) {
         let init_tangle = tangle;
         let mut result = (0u32, 0u32);
-        for log_s in (0u32 .. 4) {
+        for log_s in 0u32..4 {
             let shifted = (tangle >> (16 * log_s)) as u16;
             let (x_byte, y_byte) = self.detangle[shifted as usize];
             let rotation = self.rotation[(((x_byte as u16) << 8) + y_byte as u16) as usize];
@@ -307,7 +312,7 @@ impl BytewiseHilbert {
 
 fn bit_entangle(mut pair: (u32, u32)) -> u64 {
     let mut result = 0u64;
-    for log_s_rev in (0 .. 32) {
+    for log_s_rev in 0..32 {
         let log_s = 31 - log_s_rev;
         let rx = (pair.0 >> log_s) & 1u32;
         let ry = (pair.1 >> log_s) & 1u32;
@@ -320,7 +325,7 @@ fn bit_entangle(mut pair: (u32, u32)) -> u64 {
 
 fn bit_detangle(tangle: u64) -> (u32, u32) {
     let mut result = (0u32, 0u32);
-    for log_s in (0 .. 32) {
+    for log_s in 0..32 {
         let shifted = ((tangle >> (2 * log_s)) & 3u64) as u32;
 
         let rx = (shifted >> 1) & 1u32;

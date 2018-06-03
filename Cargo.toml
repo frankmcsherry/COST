@@ -8,3 +8,4 @@ authors = ["Frank McSherry <fmcsherry@me.com>"]
 docopt="*"
 byteorder="*"
 mmap="*"
+lz4="*"
