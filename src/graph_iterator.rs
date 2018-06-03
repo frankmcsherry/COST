@@ -3,7 +3,7 @@ use hilbert_curve::BytewiseCached;
 use typedrw::TypedMemoryMap;
 
 pub trait EdgeMapper {
-    fn map_edges<F: FnMut(u32, u32)>(&self, action: F);
+    fn map_edges(&self, action: impl FnMut(u32, u32));
 }
 
 pub struct DeltaCompressedReaderMapper<R: Read, F: Fn()->R> {
@@ -19,7 +19,7 @@ impl<R: Read, F: Fn()->R> DeltaCompressedReaderMapper<R, F> {
 }
 
 impl<R: Read, F: Fn()->R> EdgeMapper for DeltaCompressedReaderMapper<R, F> {
-    fn map_edges<A: FnMut(u32, u32)>(&self, mut action: A) {
+    fn map_edges(&self, mut action: impl FnMut(u32, u32)) {
 
         let mut hilbert = BytewiseCached::new();
         let mut current = 0u64;
@@ -68,7 +68,7 @@ impl<'a> DeltaCompressedSliceMapper<'a> {
 }
 
 impl<'a> EdgeMapper for DeltaCompressedSliceMapper<'a> {
-    fn map_edges<A: FnMut(u32, u32)>(&self, mut action: A) {
+    fn map_edges(&self, mut action: impl FnMut(u32, u32)) {
 
         let mut hilbert = BytewiseCached::new();
         let mut current = 0u64;
@@ -192,7 +192,7 @@ impl UpperLowerMemMapper {
 }
 
 impl EdgeMapper for UpperLowerMemMapper {
-    fn map_edges<F: FnMut(u32, u32)>(&self, mut action: F) {
+    fn map_edges(&self, mut action: impl FnMut(u32, u32)) {
         let mut slice = &self.lower[..];
         for &((u16_x, u16_y), count) in &self.upper[..] {
             let u16_x = (u16_x as u32) << 16;
@@ -221,7 +221,7 @@ impl NodesEdgesMemMapper {
 }
 
 impl EdgeMapper for NodesEdgesMemMapper {
-    fn map_edges<F: FnMut(u32, u32)>(&self, mut action: F) {
+    fn map_edges(&self, mut action: impl FnMut(u32, u32)) {
         let mut slice = &self.edges[..];
         for &(node, count) in &self.nodes[..] {
             for &edge in &slice[.. count as usize] {
@@ -233,15 +233,12 @@ impl EdgeMapper for NodesEdgesMemMapper {
     }
 }
 
-// use std::fs::File;
-// use byteorder::{WriteBytesExt, LittleEndian};
-
 pub struct ReaderMapper<B: ::std::io::BufRead, F: Fn() -> B> {
     pub reader: F,
 }
 
 impl<R: ::std::io::BufRead, RF: Fn() -> R> EdgeMapper for ReaderMapper<R, RF> {
-    fn map_edges<F: FnMut(u32, u32) -> ()>(&self, mut action: F) -> () {
+    fn map_edges(&self, mut action: impl FnMut(u32, u32)) {
         let reader = (self.reader)();
         for readline in reader.lines() {
             let line = readline.ok().expect("read error");
