@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 
 extern crate lz4;
-extern crate mmap;
 extern crate byteorder;
 
 extern crate docopt;

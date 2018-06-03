@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 extern crate lz4;
-extern crate mmap;
+extern crate memmap;
 extern crate byteorder;
 
 pub mod typedrw;

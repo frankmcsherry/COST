@@ -7,5 +7,5 @@ authors = ["Frank McSherry <fmcsherry@me.com>"]
 [dependencies]
 docopt="*"
 byteorder="*"
-mmap="*"
+memmap="0.5"
 lz4="*"
