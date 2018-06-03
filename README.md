@@ -29,7 +29,7 @@ If you acquire some excellent graph data, you could for example type
 
 which will create files `my_graph.nodes` and `my_graph.edges`. These files will generally be smaller than the textual representation, though the `.nodes` file will use space proportional to the largest vertex identifier.
 
-Once you have ingressed some graph data, you can also re-arrange the data according to a Hilbert curve, which is an excellent bit of mothematics you can search for and read about if you so care.
+Once you have ingressed some graph data, you can also re-arrange the data according to a Hilbert curve, which is an excellent bit of mathematics you can search for and read about if you so care.
 
     Echidnatron% cargo run --release --bin to_hilbert -- my_graph
 
