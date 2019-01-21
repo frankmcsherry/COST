@@ -32,7 +32,7 @@ fn main() {
 fn stats<G: EdgeMapper>(graph: &G) -> u32 {
     let mut max_x = 0;
     let mut max_y = 0;
-    let mut edges = 0;
+    let mut edges = 0u64;
     graph.map_edges(|x, y| {
         if max_x < x { max_x = x; }
         if max_y < y { max_y = y; }
